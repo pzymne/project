@@ -1,0 +1,506 @@
+import {
+  bytesToBigInt,
+  bytesToBool,
+  bytesToHex,
+  bytesToNumber,
+  hexToBytes,
+  hexToNumber,
+  parseEventLogs,
+  sliceHex,
+} from "viem";
+import { getTransactionReceipt } from "viem/actions";
+
+import { WormholeDataAdapterAbi } from "../../chains/evm/common/constants/abi/wormhole-data-adapter-abi.js";
+import {
+  GAS_LIMIT_ESTIMATE_INCREASE,
+  GAS_LIMIT_WH_EXECUTOR_ESTIMATE_INCREASE,
+  HUB_GAS_LIMIT_SLIPPAGE,
+  MONAD_GAS_LIMIT_WH_EXECUTOR_ESTIMATE_INCREASE,
+} from "../../chains/evm/common/constants/contract.js";
+import {
+  buildEvmMessageToSend,
+  estimateEvmCcipDataGasLimit,
+  estimateEvmWormholeDataGasLimit,
+  estimateEvmWormholeExecutorDataGasLimit,
+  getSendTokenStateOverride,
+  getWormholeGuardiansStateOverride,
+} from "../../chains/evm/common/utils/message.js";
+import { getHubChainAdapterAddress, isHubChain } from "../../chains/evm/hub/utils/chain.js";
+import { exhaustiveCheck } from "../../utils/exhaustive-check.js";
+import { BYTES32_LENGTH, BYTES4_LENGTH, UINT16_LENGTH, UINT256_LENGTH, UINT8_LENGTH } from "../constants/bytes.js";
+import { MAINNET_FOLKS_CHAIN_ID } from "../constants/chain.js";
+import { REVERSIBLE_HUB_ACTIONS, SEND_TOKEN_ACTIONS } from "../constants/message.js";
+import { ChainType } from "../types/chain.js";
+import { MessageDirection } from "../types/gmp.js";
+import { Action, AdapterType } from "../types/message.js";
+
+import { convertFromGenericAddress } from "./address.js";
+import { getFolksChain, getNetworkFromFolksChainId, getSpokeChainAdapterAddress } from "./chain.js";
+import { getCcipData, getWormholeData, getMockWormholeGuardiansData, checkWormholeExecutorCapability } from "./gmp.js";
+import { safeSliceHex } from "./hex.js";
+import { increaseByPercent } from "./math-lib.js";
+import { waitTransaction } from "./transaction.js";
+
+import type { PoolEpoch, ReceiveRewardToken } from "../../chains/evm/hub/types/rewards-v2.js";
+import type { GenericAddress } from "../types/address.js";
+import type { FolksChainId, NetworkType } from "../types/chain.js";
+import type { FolksProvider } from "../types/core.js";
+import type { AccountId, LoanId, LoanName, Nonce } from "../types/lending.js";
+import type {
+  MessageAdapters,
+  MessageBuilderParams,
+  MessageDataMap,
+  MessageToSend,
+  OptionalFeeParams,
+  Payload,
+} from "../types/message.js";
+import type { RewardsTokenId } from "../types/rewards.js";
+import type { Client as EVMProvider, Hex, StateOverride } from "viem";
+
+export function buildMessageToSend(
+  chainType: ChainType,
+  messageToSendBuilderParams: MessageBuilderParams,
+  feeParams: OptionalFeeParams = {},
+): MessageToSend {
+  switch (chainType) {
+    case ChainType.EVM: {
+      return buildEvmMessageToSend(messageToSendBuilderParams, feeParams);
+    }
+    default:
+      return exhaustiveCheck(chainType);
+  }
+}
+
+function getAdapterId(messageDirection: MessageDirection, adapters: MessageAdapters): AdapterType {
+  if (messageDirection === MessageDirection.SpokeToHub) return adapters.adapterId;
+  return adapters.returnAdapterId;
+}
+
+function getAdaptersAddresses(
+  messageDirection: MessageDirection,
+  sourceFolksChainId: FolksChainId,
+  destFolksChainId: FolksChainId,
+  network: NetworkType,
+  adapterId: AdapterType,
+  isRewards = false,
+) {
+  if (messageDirection === MessageDirection.SpokeToHub)
+    return {
+      sourceAdapterAddress: getSpokeChainAdapterAddress(sourceFolksChainId, network, adapterId, isRewards),
+      destAdapterAddress: getHubChainAdapterAddress(network, adapterId, isRewards),
+    };
+  return {
+    sourceAdapterAddress: getHubChainAdapterAddress(network, adapterId, isRewards),
+    destAdapterAddress: getSpokeChainAdapterAddress(destFolksChainId, network, adapterId, isRewards),
+  };
+}
+
+export async function estimateAdapterReceiveGasLimit(
+  sourceFolksChainId: FolksChainId,
+  destFolksChainId: FolksChainId,
+  destFolksChainProvider: FolksProvider,
+  network: NetworkType,
+  messageDirection: MessageDirection,
+  messageBuilderParams: MessageBuilderParams,
+  receiverValue = BigInt(0),
+  returnGasLimit = BigInt(0),
+  isRewards = false,
+) {
+  const destFolksChain = getFolksChain(destFolksChainId, network);
+
+  const adapterId = getAdapterId(messageDirection, messageBuilderParams.adapters);
+  const { sourceAdapterAddress, destAdapterAddress } = getAdaptersAddresses(
+    messageDirection,
+    sourceFolksChainId,
+    destFolksChainId,
+    network,
+    adapterId,
+    isRewards,
+  );
+
+  switch (destFolksChain.chainType) {
+    case ChainType.EVM: {
+      let stateOverride: StateOverride = [];
+      if (messageBuilderParams.action === Action.SendToken) {
+        stateOverride = stateOverride.concat(
+          getSendTokenStateOverride(destFolksChainId, messageBuilderParams.overrideData),
+        );
+      }
+      switch (adapterId) {
+        case AdapterType.HUB: {
+          return 0n;
+        }
+        case AdapterType.WORMHOLE_DATA: {
+          const sourceWormholeChainId = getWormholeData(sourceFolksChainId).wormholeChainId;
+          const wormholeRelayer = convertFromGenericAddress(
+            getWormholeData(destFolksChainId).wormholeRelayer,
+            ChainType.EVM,
+          );
+
+          const gasLimitEstimation = await estimateEvmWormholeDataGasLimit(
+            // eslint-disable-next-line @typescript-eslint/non-nullable-type-assertion-style
+            destFolksChainProvider as EVMProvider,
+            messageBuilderParams,
+            receiverValue,
+            returnGasLimit,
+            sourceWormholeChainId,
+            wormholeRelayer,
+            destAdapterAddress,
+            sourceAdapterAddress,
+            stateOverride,
+          );
+          return getGasLimitAfterIncrease(destFolksChainId, gasLimitEstimation);
+        }
+        case AdapterType.WORMHOLE_CCTP: {
+          const { sourceAdapterAddress, destAdapterAddress } = getAdaptersAddresses(
+            messageDirection,
+            sourceFolksChainId,
+            destFolksChainId,
+            network,
+            AdapterType.WORMHOLE_DATA,
+            isRewards,
+          );
+          const sourceWormholeChainId = getWormholeData(sourceFolksChainId).wormholeChainId;
+          const wormholeRelayer = convertFromGenericAddress(
+            getWormholeData(destFolksChainId).wormholeRelayer,
+            ChainType.EVM,
+          );
+
+          // Due to ERC20 transfer and additional checks in the Wormhole CCTP Adapter
+          const ADAPTER_EXTRA_GAS_LIMIT = 150_000n;
+
+          const gasLimitEstimation = await estimateEvmWormholeDataGasLimit(
+            // eslint-disable-next-line @typescript-eslint/non-nullable-type-assertion-style
+            destFolksChainProvider as EVMProvider,
+            messageBuilderParams,
+            receiverValue,
+            returnGasLimit,
+            sourceWormholeChainId,
+            wormholeRelayer,
+            destAdapterAddress,
+            sourceAdapterAddress,
+            stateOverride,
+          );
+          return getGasLimitAfterIncrease(destFolksChainId, gasLimitEstimation) + ADAPTER_EXTRA_GAS_LIMIT;
+        }
+        case AdapterType.CCIP_DATA: {
+          const sourceCcipChainId = getCcipData(sourceFolksChainId).ccipChainId;
+          const ccipRouter = convertFromGenericAddress(getCcipData(destFolksChainId).ccipRouter, ChainType.EVM);
+
+          const gasLimitEstimation = await estimateEvmCcipDataGasLimit(
+            // eslint-disable-next-line @typescript-eslint/non-nullable-type-assertion-style
+            destFolksChainProvider as EVMProvider,
+            messageBuilderParams,
+            returnGasLimit,
+            sourceCcipChainId,
+            ccipRouter,
+            destAdapterAddress,
+            sourceAdapterAddress,
+          );
+          return getGasLimitAfterIncrease(destFolksChainId, gasLimitEstimation);
+        }
+        case AdapterType.CCIP_TOKEN: {
+          const { sourceAdapterAddress, destAdapterAddress } = getAdaptersAddresses(
+            messageDirection,
+            sourceFolksChainId,
+            destFolksChainId,
+            network,
+            AdapterType.CCIP_DATA,
+            isRewards,
+          );
+          const sourceCcipChainId = getCcipData(sourceFolksChainId).ccipChainId;
+          const ccipRouter = convertFromGenericAddress(getCcipData(destFolksChainId).ccipRouter, ChainType.EVM);
+
+          // Due to ERC20 transfer and additional checks in the CCIP Token Adapter
+          const ADAPTER_EXTRA_GAS_LIMIT = 150_000n;
+
+          const gasLimitEstimation = await estimateEvmCcipDataGasLimit(
+            // eslint-disable-next-line @typescript-eslint/non-nullable-type-assertion-style
+            destFolksChainProvider as EVMProvider,
+            messageBuilderParams,
+            returnGasLimit,
+            sourceCcipChainId,
+            ccipRouter,
+            destAdapterAddress,
+            sourceAdapterAddress,
+          );
+          return getGasLimitAfterIncrease(destFolksChainId, gasLimitEstimation) + ADAPTER_EXTRA_GAS_LIMIT;
+        }
+        case AdapterType.WORMHOLE_EXECUTOR_DATA: {
+          const sourceWormholeChainId = getWormholeData(sourceFolksChainId).wormholeChainId;
+          const destWormholeChainId = getWormholeData(destFolksChainId).wormholeChainId;
+          const mockWormholeGuardiansData = getMockWormholeGuardiansData(network);
+
+          const wormholeGuardiansOverride = getWormholeGuardiansStateOverride(
+            destFolksChainId,
+            mockWormholeGuardiansData,
+          );
+          const gasLimitEstimation = await estimateEvmWormholeExecutorDataGasLimit(
+            // eslint-disable-next-line @typescript-eslint/non-nullable-type-assertion-style
+            destFolksChainProvider as EVMProvider,
+            messageBuilderParams,
+            receiverValue,
+            returnGasLimit,
+            sourceWormholeChainId,
+            destWormholeChainId,
+            mockWormholeGuardiansData,
+            destAdapterAddress,
+            sourceAdapterAddress,
+            [...stateOverride, ...wormholeGuardiansOverride],
+          );
+          const gasLimit = getGasLimitAfterIncrease(destFolksChainId, gasLimitEstimation);
+          await checkWormholeExecutorCapability(network, destWormholeChainId, gasLimit, receiverValue);
+
+          return gasLimit + getWormholeExecutorExtraGasLimit(destFolksChainId); // Adding extra buffer for the execution
+        }
+        default:
+          return exhaustiveCheck(adapterId);
+      }
+    }
+    default:
+      return exhaustiveCheck(destFolksChain.chainType);
+  }
+}
+
+export async function getOperationIdsByTransaction(chainType: ChainType, folksProvider: FolksProvider, txnHash: Hex) {
+  switch (chainType) {
+    case ChainType.EVM: {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      const receipt = await getTransactionReceipt(folksProvider!, {
+        hash: txnHash,
+      });
+      const logs = parseEventLogs({
+        abi: WormholeDataAdapterAbi,
+        logs: receipt.logs,
+        eventName: "SendMessage",
+      });
+      return logs.map((log) => log.args.operationId);
+    }
+    default:
+      return exhaustiveCheck(chainType);
+  }
+}
+
+export async function waitOperationIds(
+  chainType: ChainType,
+  folksProvider: FolksProvider,
+  txnHash: Hex,
+  confirmations = 1,
+) {
+  switch (chainType) {
+    case ChainType.EVM: {
+      const receipt = await waitTransaction(chainType, folksProvider, txnHash, confirmations);
+      return await getOperationIdsByTransaction(chainType, folksProvider, receipt.transactionHash);
+    }
+    default:
+      return exhaustiveCheck(chainType);
+  }
+}
+
+export function isReversibleAction(action: Action, messageDirection: MessageDirection) {
+  // @ts-expect-error: ts(2345)
+  return messageDirection === MessageDirection.HubToSpoke && REVERSIBLE_HUB_ACTIONS.includes(action);
+}
+
+export function assertReversibleAction(action: Action, messageDirection: MessageDirection) {
+  if (!isReversibleAction(action, messageDirection))
+    throw new Error(`Action ${action} is not reversible for message direction ${messageDirection}`);
+}
+
+export function isRetryableAction(action: Action, messageDirection: MessageDirection) {
+  // @ts-expect-error: ts(2345)
+  return messageDirection === MessageDirection.HubToSpoke || SEND_TOKEN_ACTIONS.includes(action);
+}
+
+export function assertRetryableAction(action: Action, messageDirection: MessageDirection) {
+  if (!isRetryableAction(action, messageDirection))
+    throw new Error(`Action ${action} is not retryable for message direction ${messageDirection}`);
+}
+
+export function decodeMessagePayload(payload: Hex): Payload {
+  return {
+    action: hexToNumber(sliceHex(payload, 0, UINT16_LENGTH)) as Action,
+    accountId: sliceHex(payload, UINT16_LENGTH, UINT16_LENGTH + BYTES32_LENGTH) as AccountId,
+    userAddr: sliceHex(
+      payload,
+      UINT16_LENGTH + BYTES32_LENGTH,
+      UINT16_LENGTH + BYTES32_LENGTH + BYTES32_LENGTH,
+    ) as GenericAddress,
+    data: safeSliceHex(payload, UINT16_LENGTH + BYTES32_LENGTH + BYTES32_LENGTH),
+  };
+}
+
+export function decodeMessagePayloadData<A extends Action>(action: A, data: Hex): MessageDataMap[A] {
+  const bytes = hexToBytes(data);
+  switch (action) {
+    case Action.CreateAccount: {
+      return {
+        nonce: bytesToHex(bytes.slice(0, BYTES4_LENGTH)) as Nonce,
+        refAccountId: bytesToHex(bytes.slice(-BYTES32_LENGTH)) as AccountId,
+      } as MessageDataMap[A];
+    }
+    case Action.InviteAddress: {
+      return {
+        folksChainIdToInvite: bytesToNumber(bytes.slice(0, UINT16_LENGTH)) as FolksChainId,
+        addressToInvite: bytesToHex(bytes.slice(UINT16_LENGTH, -BYTES32_LENGTH)) as GenericAddress,
+        refAccountId: bytesToHex(bytes.slice(-BYTES32_LENGTH)) as AccountId,
+      } as MessageDataMap[A];
+    }
+    case Action.UnregisterAddress: {
+      return {
+        folksChainIdToUnregister: bytesToNumber(bytes.slice(0, UINT16_LENGTH)) as FolksChainId,
+      } as MessageDataMap[A];
+    }
+    case Action.CreateLoan: {
+      return {
+        nonce: bytesToHex(bytes.slice(0, BYTES4_LENGTH)) as Nonce,
+        loanTypeId: bytesToNumber(bytes.slice(BYTES4_LENGTH, BYTES4_LENGTH + UINT16_LENGTH)),
+        loanName: bytesToHex(bytes.slice(BYTES4_LENGTH + UINT16_LENGTH)) as LoanName,
+      } as MessageDataMap[A];
+    }
+    case Action.CreateLoanAndDeposit: {
+      return {
+        nonce: bytesToHex(bytes.slice(0, BYTES4_LENGTH)) as Nonce,
+        poolId: bytesToNumber(bytes.slice(BYTES4_LENGTH, BYTES4_LENGTH + UINT8_LENGTH)),
+        amount: bytesToBigInt(bytes.slice(BYTES4_LENGTH + UINT8_LENGTH, BYTES4_LENGTH + UINT8_LENGTH + UINT256_LENGTH)),
+        loanTypeId: bytesToNumber(
+          bytes.slice(
+            BYTES4_LENGTH + UINT8_LENGTH + UINT256_LENGTH,
+            BYTES4_LENGTH + UINT8_LENGTH + UINT256_LENGTH + UINT16_LENGTH,
+          ),
+        ),
+        loanName: bytesToHex(bytes.slice(BYTES4_LENGTH + UINT8_LENGTH + UINT256_LENGTH + UINT16_LENGTH)) as LoanName,
+      } as MessageDataMap[A];
+    }
+    case Action.Deposit: {
+      return {
+        loanId: bytesToHex(bytes.slice(0, BYTES32_LENGTH)) as LoanId,
+        poolId: bytesToNumber(bytes.slice(BYTES32_LENGTH, BYTES32_LENGTH + UINT8_LENGTH)),
+        amount: bytesToBigInt(bytes.slice(BYTES32_LENGTH + UINT8_LENGTH)),
+      } as MessageDataMap[A];
+    }
+    case Action.Withdraw: {
+      return {
+        loanId: bytesToHex(bytes.slice(0, BYTES32_LENGTH)) as LoanId,
+        poolId: bytesToNumber(bytes.slice(BYTES32_LENGTH, BYTES32_LENGTH + UINT8_LENGTH)),
+        receiverFolksChainId: bytesToNumber(
+          bytes.slice(BYTES32_LENGTH + UINT8_LENGTH, BYTES32_LENGTH + UINT8_LENGTH + UINT16_LENGTH),
+        ) as FolksChainId,
+        amount: bytesToBigInt(bytes.slice(BYTES32_LENGTH + UINT8_LENGTH + UINT16_LENGTH, -1)),
+        isFAmount: bytesToBool(bytes.slice(-1)),
+      } as MessageDataMap[A];
+    }
+    case Action.Borrow: {
+      return {
+        loanId: bytesToHex(bytes.slice(0, BYTES32_LENGTH)) as LoanId,
+        poolId: bytesToNumber(bytes.slice(BYTES32_LENGTH, BYTES32_LENGTH + UINT8_LENGTH)),
+        receiverFolksChainId: bytesToNumber(
+          bytes.slice(BYTES32_LENGTH + UINT8_LENGTH, BYTES32_LENGTH + UINT8_LENGTH + UINT16_LENGTH),
+        ) as FolksChainId,
+        amount: bytesToBigInt(
+          bytes.slice(
+            BYTES32_LENGTH + UINT8_LENGTH + UINT16_LENGTH,
+            BYTES32_LENGTH + UINT8_LENGTH + UINT16_LENGTH + UINT256_LENGTH,
+          ),
+        ),
+        maxStableRate: bytesToBigInt(bytes.slice(BYTES32_LENGTH + UINT8_LENGTH + UINT16_LENGTH + UINT256_LENGTH)),
+      } as MessageDataMap[A];
+    }
+    case Action.Repay: {
+      return {
+        loanId: bytesToHex(bytes.slice(0, BYTES32_LENGTH)) as LoanId,
+        poolId: bytesToNumber(bytes.slice(BYTES32_LENGTH, BYTES32_LENGTH + UINT8_LENGTH)),
+        amount: bytesToBigInt(
+          bytes.slice(BYTES32_LENGTH + UINT8_LENGTH, BYTES32_LENGTH + UINT8_LENGTH + UINT256_LENGTH),
+        ),
+        maxOverRepayment: bytesToBigInt(bytes.slice(BYTES32_LENGTH + UINT8_LENGTH + UINT256_LENGTH)),
+      } as MessageDataMap[A];
+    }
+    case Action.RepayWithCollateral: {
+      return {
+        loanId: bytesToHex(bytes.slice(0, BYTES32_LENGTH)) as LoanId,
+        poolId: bytesToNumber(bytes.slice(BYTES32_LENGTH, BYTES32_LENGTH + UINT8_LENGTH)),
+        amount: bytesToBigInt(bytes.slice(BYTES32_LENGTH + UINT8_LENGTH)),
+      } as MessageDataMap[A];
+    }
+    case Action.Liquidate: {
+      return {
+        violatorLoanId: bytesToHex(bytes.slice(0, BYTES32_LENGTH)) as LoanId,
+        liquidatorLoanId: bytesToHex(bytes.slice(BYTES32_LENGTH, BYTES32_LENGTH * 2)) as LoanId,
+        colPoolId: bytesToNumber(bytes.slice(BYTES32_LENGTH * 2, BYTES32_LENGTH * 2 + UINT8_LENGTH)),
+        borPoolId: bytesToNumber(bytes.slice(BYTES32_LENGTH * 2 + UINT8_LENGTH, BYTES32_LENGTH * 2 + UINT8_LENGTH * 2)),
+        repayingAmount: bytesToBigInt(
+          bytes.slice(BYTES32_LENGTH * 2 + UINT8_LENGTH * 2, BYTES32_LENGTH * 2 + UINT8_LENGTH * 2 + UINT256_LENGTH),
+        ),
+        minSeizedAmount: bytesToBigInt(bytes.slice(BYTES32_LENGTH * 2 + UINT8_LENGTH * 2 + UINT256_LENGTH)),
+      } as MessageDataMap[A];
+    }
+    case Action.SwitchBorrowType: {
+      return {
+        loanId: bytesToHex(bytes.slice(0, BYTES32_LENGTH)) as LoanId,
+        poolId: bytesToNumber(bytes.slice(BYTES32_LENGTH, BYTES32_LENGTH + UINT8_LENGTH)),
+        maxStableRate: bytesToBigInt(bytes.slice(BYTES32_LENGTH + UINT8_LENGTH)),
+      } as MessageDataMap[A];
+    }
+    case Action.SendToken: {
+      return {
+        amount: bytesToBigInt(bytes),
+      } as MessageDataMap[A];
+    }
+    case Action.ClaimRewardsV2: {
+      let index = 0;
+      const poolEpochsToClaimLength = bytesToBigInt(bytes.slice(index, index + UINT8_LENGTH));
+      index += UINT8_LENGTH;
+      const rewardTokensToReceiveLength = bytesToBigInt(bytes.slice(index, index + UINT8_LENGTH));
+      index += UINT8_LENGTH;
+
+      const poolEpochsToClaim: Array<PoolEpoch> = [];
+      for (let i = 0; i < poolEpochsToClaimLength; i++) {
+        const poolId = Number(bytesToBigInt(bytes.slice(index, index + UINT8_LENGTH)));
+        index += UINT8_LENGTH;
+        const epochIndex = Number(bytesToBigInt(bytes.slice(index, index + UINT16_LENGTH)));
+        index += UINT16_LENGTH;
+        poolEpochsToClaim.push({ poolId, epochIndex });
+      }
+
+      const rewardTokensToReceive: Array<ReceiveRewardToken> = [];
+      for (let i = 0; i < rewardTokensToReceiveLength; i++) {
+        const rewardTokenId = Number(bytesToBigInt(bytes.slice(index, index + UINT8_LENGTH))) as RewardsTokenId;
+        index += UINT8_LENGTH;
+        const returnAdapterId = Number(bytesToBigInt(bytes.slice(index, index + UINT16_LENGTH)));
+        index += UINT16_LENGTH;
+        const returnGasLimit = bytesToBigInt(bytes.slice(index, index + UINT256_LENGTH));
+        index += UINT256_LENGTH;
+        rewardTokensToReceive.push({ rewardTokenId, returnAdapterId, returnGasLimit });
+      }
+
+      return {
+        poolEpochsToClaim,
+        rewardTokensToReceive,
+      } as MessageDataMap[A];
+    }
+    case Action.AcceptInviteAddress:
+    case Action.AddDelegate:
+    case Action.RemoveDelegate:
+    case Action.DeleteLoan:
+    case Action.DepositFToken:
+    case Action.WithdrawFToken:
+      throw new Error("No data to decode for this action");
+    default:
+      return exhaustiveCheck(action);
+  }
+}
+
+export function getGasLimitAfterIncrease(
+  folksChainId: FolksChainId,
+  gasLimit: bigint,
+  network: NetworkType = getNetworkFromFolksChainId(folksChainId),
+): bigint {
+  if (isHubChain(folksChainId, network)) return increaseByPercent(gasLimit, HUB_GAS_LIMIT_SLIPPAGE);
+  return gasLimit + GAS_LIMIT_ESTIMATE_INCREASE;
+}
+
+export function getWormholeExecutorExtraGasLimit(folksChainId: FolksChainId) {
+  if (folksChainId === MAINNET_FOLKS_CHAIN_ID.MONAD) return MONAD_GAS_LIMIT_WH_EXECUTOR_ESTIMATE_INCREASE;
+  return GAS_LIMIT_WH_EXECUTOR_ESTIMATE_INCREASE;
+}

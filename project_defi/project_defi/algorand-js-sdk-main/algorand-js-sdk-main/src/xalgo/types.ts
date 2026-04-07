@@ -1,0 +1,32 @@
+interface ConsensusConfig {
+  consensusAppId: number;
+  xAlgoId: number;
+  stakeAndDepositAppId: number;
+}
+
+interface ConsensusState {
+  currentRound: number; // round the data was read at
+  algoBalance: bigint;
+  xAlgoCirculatingSupply: bigint;
+  proposersBalances: {
+    address: string;
+    algoBalance: bigint;
+  }[];
+  adminAddress: string;
+  registerAdminAddress: string;
+  xGovAdminAddress: string;
+  timeDelay: bigint;
+  numProposers: bigint;
+  maxProposerBalance: bigint;
+  fee: bigint; // 4 d.p.
+  premium: bigint; // 16 d.p.
+  lastProposersActiveBalance: bigint;
+  totalPendingStake: bigint;
+  totalUnclaimedFees: bigint;
+  canImmediateStake: boolean;
+  canDelayStake: boolean;
+}
+
+type ProposerAllocations = bigint[];
+
+export { ConsensusConfig, ConsensusState, ProposerAllocations };
