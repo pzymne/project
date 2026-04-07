@@ -1,0 +1,44 @@
+specVersion: 0.0.5
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: Seaport
+    network: mainnet
+    source:
+      abi: Seaport
+      address: "0x00000000000001ad428e4906aE43D8F9852d0dD6"
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - OrderFulfilled
+      abis:
+        - name: Seaport
+          file: ./abis/Seaport.json
+      eventHandlers:
+        - event: OrderFulfilled(bytes32,indexed address,indexed
+            address,address,(uint8,address,uint256,uint256)[],(uint8,address,uint256,uint256,address)[])
+          handler: handleOrderFulfilled
+      file: ./src/Seaport/index.ts
+  - kind: ethereum
+    name: LooksRareV1
+    network: mainnet
+    source:
+      abi: LooksRareExchange
+      address: "0x59728544B08AB483533076417FbBB2fD0B17CE3a"
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - TakerBid
+      abis:
+        - name: LooksRareExchange
+          file: ./abis/LooksRareExchange.json
+      eventHandlers:
+        - event: TakerBid(bytes32,uint256,indexed address,indexed address,indexed
+            address,address,address,uint256,uint256,uint256)
+          handler: handleTakerBid
+      file: ./src/LooksRareV1/index.ts

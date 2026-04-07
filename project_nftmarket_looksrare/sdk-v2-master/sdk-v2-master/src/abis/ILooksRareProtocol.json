@@ -1,0 +1,677 @@
+[
+  {
+    "inputs": [],
+    "name": "ChainIdInvalid",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "NewGasLimitETHTransferTooLow",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "NoncesInvalid",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "SameDomainSeparator",
+    "type": "error"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "affiliate",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "currency",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "affiliateFee",
+        "type": "uint256"
+      }
+    ],
+    "name": "AffiliatePayment",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [],
+    "name": "NewDomainSeparator",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "gasLimitETHTransfer",
+        "type": "uint256"
+      }
+    ],
+    "name": "NewGasLimitETHTransfer",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "components": [
+          {
+            "internalType": "bytes32",
+            "name": "orderHash",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "uint256",
+            "name": "orderNonce",
+            "type": "uint256"
+          },
+          {
+            "internalType": "bool",
+            "name": "isNonceInvalidated",
+            "type": "bool"
+          }
+        ],
+        "indexed": false,
+        "internalType": "struct ILooksRareProtocol.NonceInvalidationParameters",
+        "name": "nonceInvalidationParameters",
+        "type": "tuple"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "askUser",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "bidUser",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "strategyId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "currency",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "collection",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256[]",
+        "name": "itemIds",
+        "type": "uint256[]"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256[]",
+        "name": "amounts",
+        "type": "uint256[]"
+      },
+      {
+        "indexed": false,
+        "internalType": "address[2]",
+        "name": "feeRecipients",
+        "type": "address[2]"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256[3]",
+        "name": "feeAmounts",
+        "type": "uint256[3]"
+      }
+    ],
+    "name": "TakerAsk",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "components": [
+          {
+            "internalType": "bytes32",
+            "name": "orderHash",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "uint256",
+            "name": "orderNonce",
+            "type": "uint256"
+          },
+          {
+            "internalType": "bool",
+            "name": "isNonceInvalidated",
+            "type": "bool"
+          }
+        ],
+        "indexed": false,
+        "internalType": "struct ILooksRareProtocol.NonceInvalidationParameters",
+        "name": "nonceInvalidationParameters",
+        "type": "tuple"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "bidUser",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "bidRecipient",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "strategyId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "currency",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "collection",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256[]",
+        "name": "itemIds",
+        "type": "uint256[]"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256[]",
+        "name": "amounts",
+        "type": "uint256[]"
+      },
+      {
+        "indexed": false,
+        "internalType": "address[2]",
+        "name": "feeRecipients",
+        "type": "address[2]"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256[3]",
+        "name": "feeAmounts",
+        "type": "uint256[3]"
+      }
+    ],
+    "name": "TakerBid",
+    "type": "event"
+  },
+  {
+    "inputs": [
+      {
+        "components": [
+          {
+            "internalType": "address",
+            "name": "recipient",
+            "type": "address"
+          },
+          {
+            "internalType": "bytes",
+            "name": "additionalParameters",
+            "type": "bytes"
+          }
+        ],
+        "internalType": "struct OrderStructs.Taker[]",
+        "name": "takerBids",
+        "type": "tuple[]"
+      },
+      {
+        "components": [
+          {
+            "internalType": "enum QuoteType",
+            "name": "quoteType",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint256",
+            "name": "globalNonce",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "subsetNonce",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "orderNonce",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "strategyId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "enum CollectionType",
+            "name": "collectionType",
+            "type": "uint8"
+          },
+          {
+            "internalType": "address",
+            "name": "collection",
+            "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "currency",
+            "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "signer",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "startTime",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "endTime",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "price",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256[]",
+            "name": "itemIds",
+            "type": "uint256[]"
+          },
+          {
+            "internalType": "uint256[]",
+            "name": "amounts",
+            "type": "uint256[]"
+          },
+          {
+            "internalType": "bytes",
+            "name": "additionalParameters",
+            "type": "bytes"
+          }
+        ],
+        "internalType": "struct OrderStructs.Maker[]",
+        "name": "makerAsks",
+        "type": "tuple[]"
+      },
+      {
+        "internalType": "bytes[]",
+        "name": "makerSignatures",
+        "type": "bytes[]"
+      },
+      {
+        "components": [
+          {
+            "internalType": "bytes32",
+            "name": "root",
+            "type": "bytes32"
+          },
+          {
+            "components": [
+              {
+                "internalType": "bytes32",
+                "name": "value",
+                "type": "bytes32"
+              },
+              {
+                "internalType": "enum OrderStructs.MerkleTreeNodePosition",
+                "name": "position",
+                "type": "uint8"
+              }
+            ],
+            "internalType": "struct OrderStructs.MerkleTreeNode[]",
+            "name": "proof",
+            "type": "tuple[]"
+          }
+        ],
+        "internalType": "struct OrderStructs.MerkleTree[]",
+        "name": "merkleTrees",
+        "type": "tuple[]"
+      },
+      {
+        "internalType": "address",
+        "name": "affiliate",
+        "type": "address"
+      },
+      {
+        "internalType": "bool",
+        "name": "isAtomic",
+        "type": "bool"
+      }
+    ],
+    "name": "executeMultipleTakerBids",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "components": [
+          {
+            "internalType": "address",
+            "name": "recipient",
+            "type": "address"
+          },
+          {
+            "internalType": "bytes",
+            "name": "additionalParameters",
+            "type": "bytes"
+          }
+        ],
+        "internalType": "struct OrderStructs.Taker",
+        "name": "takerAsk",
+        "type": "tuple"
+      },
+      {
+        "components": [
+          {
+            "internalType": "enum QuoteType",
+            "name": "quoteType",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint256",
+            "name": "globalNonce",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "subsetNonce",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "orderNonce",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "strategyId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "enum CollectionType",
+            "name": "collectionType",
+            "type": "uint8"
+          },
+          {
+            "internalType": "address",
+            "name": "collection",
+            "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "currency",
+            "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "signer",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "startTime",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "endTime",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "price",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256[]",
+            "name": "itemIds",
+            "type": "uint256[]"
+          },
+          {
+            "internalType": "uint256[]",
+            "name": "amounts",
+            "type": "uint256[]"
+          },
+          {
+            "internalType": "bytes",
+            "name": "additionalParameters",
+            "type": "bytes"
+          }
+        ],
+        "internalType": "struct OrderStructs.Maker",
+        "name": "makerBid",
+        "type": "tuple"
+      },
+      {
+        "internalType": "bytes",
+        "name": "makerSignature",
+        "type": "bytes"
+      },
+      {
+        "components": [
+          {
+            "internalType": "bytes32",
+            "name": "root",
+            "type": "bytes32"
+          },
+          {
+            "components": [
+              {
+                "internalType": "bytes32",
+                "name": "value",
+                "type": "bytes32"
+              },
+              {
+                "internalType": "enum OrderStructs.MerkleTreeNodePosition",
+                "name": "position",
+                "type": "uint8"
+              }
+            ],
+            "internalType": "struct OrderStructs.MerkleTreeNode[]",
+            "name": "proof",
+            "type": "tuple[]"
+          }
+        ],
+        "internalType": "struct OrderStructs.MerkleTree",
+        "name": "merkleTree",
+        "type": "tuple"
+      },
+      {
+        "internalType": "address",
+        "name": "affiliate",
+        "type": "address"
+      }
+    ],
+    "name": "executeTakerAsk",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "components": [
+          {
+            "internalType": "address",
+            "name": "recipient",
+            "type": "address"
+          },
+          {
+            "internalType": "bytes",
+            "name": "additionalParameters",
+            "type": "bytes"
+          }
+        ],
+        "internalType": "struct OrderStructs.Taker",
+        "name": "takerBid",
+        "type": "tuple"
+      },
+      {
+        "components": [
+          {
+            "internalType": "enum QuoteType",
+            "name": "quoteType",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint256",
+            "name": "globalNonce",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "subsetNonce",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "orderNonce",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "strategyId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "enum CollectionType",
+            "name": "collectionType",
+            "type": "uint8"
+          },
+          {
+            "internalType": "address",
+            "name": "collection",
+            "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "currency",
+            "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "signer",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "startTime",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "endTime",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "price",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256[]",
+            "name": "itemIds",
+            "type": "uint256[]"
+          },
+          {
+            "internalType": "uint256[]",
+            "name": "amounts",
+            "type": "uint256[]"
+          },
+          {
+            "internalType": "bytes",
+            "name": "additionalParameters",
+            "type": "bytes"
+          }
+        ],
+        "internalType": "struct OrderStructs.Maker",
+        "name": "makerAsk",
+        "type": "tuple"
+      },
+      {
+        "internalType": "bytes",
+        "name": "makerSignature",
+        "type": "bytes"
+      },
+      {
+        "components": [
+          {
+            "internalType": "bytes32",
+            "name": "root",
+            "type": "bytes32"
+          },
+          {
+            "components": [
+              {
+                "internalType": "bytes32",
+                "name": "value",
+                "type": "bytes32"
+              },
+              {
+                "internalType": "enum OrderStructs.MerkleTreeNodePosition",
+                "name": "position",
+                "type": "uint8"
+              }
+            ],
+            "internalType": "struct OrderStructs.MerkleTreeNode[]",
+            "name": "proof",
+            "type": "tuple[]"
+          }
+        ],
+        "internalType": "struct OrderStructs.MerkleTree",
+        "name": "merkleTree",
+        "type": "tuple"
+      },
+      {
+        "internalType": "address",
+        "name": "affiliate",
+        "type": "address"
+      }
+    ],
+    "name": "executeTakerBid",
+    "outputs": [],
+    "stateMutability": "payable",
+    "type": "function"
+  }
+]

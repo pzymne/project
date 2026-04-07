@@ -1,0 +1,16 @@
+{
+  "name": "royalty-fee-registry",
+  "description": "Royalty Fee Registry for NFT collections",
+  "version": "1.0.0",
+  "repository": "git@github.com:looksrare/subgraph.git",
+  "author": "LooksRare",
+  "license": "MIT",
+  "scripts": {
+    "codegen": "graph codegen subgraph.yaml",
+    "build:mainnet": "graph build subgraph.yaml",
+    "deploy:mainnet": "graph deploy --product hosted-service looksrare/royalty-fee-registry subgraph.yaml",
+    "deploy:studio": "graph codegen subgraph.yaml && graph build subgraph.yaml && graph deploy --studio looksrare-royalty-fee-registry",
+    "test": "graph test -r",
+    "test:lerna": "graph codegen subgraph.yaml && graph build subgraph.yaml && graph test -r"
+  }
+}

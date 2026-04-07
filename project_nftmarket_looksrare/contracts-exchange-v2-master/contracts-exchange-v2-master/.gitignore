@@ -1,0 +1,18 @@
+node_modules
+.env
+.env*
+coverage
+coverage.json
+typechain
+.DS_Store
+
+# Hardhat files
+cache
+artifacts
+abis/
+docs/
+
+# Forge coverage and gas
+.gas-snapshot
+lcov*
+out/

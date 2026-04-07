@@ -1,0 +1,207 @@
+"""
+User
+"""
+type User @entity {
+  "ID"
+  id: ID!
+
+  "Airdrop - Amount claimed (LOOKS)"
+  airdropAmount: BigDecimal!
+
+  "Airdrop - Claim date"
+  airdropClaimDate: BigInt!
+
+  "Aggregator - Adjusted deposit amount (LOOKS)"
+  aggregatorAdjustedDepositAmount: BigDecimal!
+
+  "Aggregator - Total LOOKS collected"
+  aggregatorTotalCollectedLOOKS: BigDecimal!
+
+  "Aggregator - Last deposit date"
+  aggregatorLastDepositDate: BigInt!
+
+  "Aggregator - Last withdraw date"
+  aggregatorLastWithdrawDate: BigInt!
+
+  "Aggregator - Is active"
+  aggregatorIsActive: Boolean!
+
+  "Fee Sharing - Adjusted deposit amount (LOOKS)"
+  feeSharingAdjustedDepositAmount: BigDecimal!
+
+  "Fee Sharing - Total LOOKS collected"
+  feeSharingTotalCollectedLOOKS: BigDecimal!
+
+  "Fee Sharing - Total WETH collected"
+  feeSharingTotalCollectedWETH: BigDecimal!
+
+  "Fee Sharing - Last deposit date"
+  feeSharingLastDepositDate: BigInt!
+
+  "Fee Sharing - Last harvest date"
+  feeSharingLastHarvestDate: BigInt!
+
+  "Fee Sharing - Last withdraw date"
+  feeSharingLastWithdrawDate: BigInt!
+
+  "Fee Sharing - Is active"
+  feeSharingIsActive: Boolean!
+
+  "Listing Rewards - Total LOOKS collected"
+  listingRewardsAmount: BigDecimal!
+
+  "Listing Rewards - Last claim date"
+  listingRewardsLastClaimDate: BigInt!
+
+  "Trading Rewards - Total LOOKS collected"
+  tradingRewardsAmount: BigDecimal!
+
+  "Trading Rewards - Last claim date"
+  tradingRewardsLastClaimDate: BigInt!
+
+  "UniswapV2 Staking - Total LOOKS collected"
+  stakingPoolUniswapV2TotalCollectedLOOKS: BigDecimal!
+
+  "UniswapV2 Staking - Last deposit date"
+  stakingPoolUniswapV2LastDepositDate: BigInt!
+
+  "UniswapV2 Staking - Last harvest date"
+  stakingPoolUniswapV2LastHarvestDate: BigInt!
+
+  "UniswapV2 Staking - Last withdraw date"
+  stakingPoolUniswapV2LastWithdrawDate: BigInt!
+}
+
+"""
+DailySnapshot
+"""
+type DailySnapshot @entity {
+  "ID"
+  id: ID!
+
+  "Date"
+  date: BigInt!
+
+  "Number unique active stakers (Aggregator + Fee Sharing)"
+  activeStakers: BigInt!
+
+  "Daily new stakers (Aggregator + Fee Sharing)"
+  newStakers: BigInt!
+
+  "Daily removed stakers (Aggregator + Fee Sharing)"
+  removedStakers: BigInt!
+
+  "Aggregator - Number active users"
+  aggregatorActiveUsers: BigInt!
+
+  "Aggregator - Daily new users"
+  aggregatorNewUsers: BigInt!
+
+  "Aggregator - Daily removed users"
+  aggregatorRemovedUsers: BigInt!
+
+  "Aggregator - Daily inflow (LOOKS)"
+  aggregatorDailyInflowLOOKS: BigDecimal!
+
+  "Aggregator - Daily outflow (LOOKS)"
+  aggregatorDailyOutflowLOOKS: BigDecimal!
+
+  "Aggregator - Total LOOKS staked"
+  aggregatorTotalStakedLOOKS: BigDecimal!
+
+  "Aggregator - Total WETH sold"
+  aggregatorTotalWETHSold: BigDecimal!
+
+  "Aggregator - Total LOOKS received from sales"
+  aggregatorTotalLOOKSReceived: BigDecimal!
+
+  "Aggregator - Number of conversions"
+  aggregatorConversionCount: BigInt!
+
+  "Fee Sharing - Number active users"
+  feeSharingActiveUsers: BigInt!
+
+  "Fee Sharing - Daily new users"
+  feeSharingNewUsers: BigInt!
+
+  "Fee Sharing - Daily removed users"
+  feeSharingRemovedUsers: BigInt!
+
+  "Fee Sharing - Daily inflow (LOOKS)"
+  feeSharingDailyInflowLOOKS: BigDecimal!
+
+  "Fee Sharing - Daily outflow (LOOKS)"
+  feeSharingDailyOutflowLOOKS: BigDecimal!
+
+  "Fee Sharing - Total LOOKS staked"
+  feeSharingTotalStakedLOOKS: BigDecimal!
+}
+
+"""
+Overview
+"""
+type Overview @entity {
+  "ID"
+  id: ID!
+
+  "Number unique active stakers (Aggregator + Fee Sharing)"
+  activeStakers: BigInt!
+
+  "Aggregator - Number active users"
+  aggregatorActiveUsers: BigInt!
+
+  "Aggregator - Total LOOKS staked"
+  aggregatorTotalStakedLOOKS: BigDecimal!
+
+  "Fee Sharing - Number active users"
+  feeSharingActiveUsers: BigInt!
+
+  "Fee Sharing - Total LOOKS staked"
+  feeSharingTotalStakedLOOKS: BigDecimal!
+}
+
+"""
+RewardPeriod
+"""
+type RewardPeriod @entity {
+  "ID (transaction hash)"
+  id: ID!
+
+  "Block number"
+  block: BigInt!
+
+  "Date (timestamp)"
+  date: BigInt!
+
+  "Period length (in blocks)"
+  numberBlocks: BigInt!
+
+  "Reward amount for the period (in WETH)"
+  reward: BigDecimal!
+
+  "Reward per block for the period (in WETH)"
+  rewardPerBlock: BigDecimal!
+}
+
+"""
+AggregatorConversion
+"""
+type AggregatorConversion @entity {
+  "ID (transaction hash)"
+  id: ID!
+
+  "Block number"
+  block: BigInt!
+
+  "Date (timestamp)"
+  date: BigInt!
+
+  "Reward sold (in WETH)"
+  amountSold: BigDecimal!
+
+  "Reward received (in LOOKS)"
+  amountReceived: BigDecimal!
+
+  "Price of 1 WETH in LOOKS"
+  priceOfETHInLOOKS: BigDecimal!
+}
